@@ -1,3 +1,9 @@
+;;;; gost_7805-70.lisp
+
+(in-package #:ost)
+
+;;; "ost" goes here. Hacks and glory await!
+
 ;;;; ГОСТ 7805-70
 
 (defparameter *gost_7805-70_head*
@@ -13,14 +19,14 @@
     ("hw	не более"                                                       nil	nil	nil	0.4	0.4	0.4	0.5	0.5	0.6	0.6	0.6	0.6	0.8	0.8	0.8	0.8	0.8	0.8	0.8	0.8	0.8	0.8)
     ("Диаметр отверстия в стержне d3"        		                        nil	nil	nil	nil	nil	1.0	1.2	1.6	2.0	2.5	3.2	3.2	4.0	4.0	4.0	5.0	4.0	4.0	6.3	6.3	8.0	8.0)
     ("Диаметр отверстия в головке d4 H15"      		                        nil	nil	nil	nil	nil	1.0	1.2	2.0	2.5	2.5	3.2	3.2	4.0	4.0	4.0	4.0	4.0	4.0	4.0	5.0	5.0	5.0)
-    ("Расстояние от опорной поверхности до оси отверстия в головке l2. js15"	nil	nil	nil	nil	nil	1.4	1.8	2.0	2.8	3.5	4.0	4.5	5.0	6.0	6.5	7.0	7.5	8.5	9.5	11.5	13.0	15.0)))
+    ("Расстояние от опорной поверхности до оси отверстия в головке l2 js15"	nil	nil	nil	nil	nil	1.4	1.8	2.0	2.8	3.5	4.0	4.5	5.0	6.0	6.5	7.0	7.5	8.5	9.5	11.5	13.0	15.0)))
 
 
 ;;;;Длина болта l	Длина резьбы b и расстояние от опорной поверхности головки до оси отверстия в стержне l1 при номинальном диаметре резьбы d (знаком × отмечены болты с резьбой на всей длине стержня)
 (defparameter *gost_7805-70_length_d*
   '(    1.6	2	2.5	3	3.5	4	4	5	5	6	6	8	8	10	10	12	12	-14	-14	16	16	-18	-18	20	20	-22	-22	24	24	-27	-27	30	30	36	36	42	42	48	48))
 
-(defparameter *gost_7805-70_length_b_l1*
+(defparameter *gost_7805-70_length_b_l1_str*
   '(       "b"	"b"	"b"	"b"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"	"l1"	"b"))
 
 (defparameter *gost_7805-70_length_d_b_l1*
@@ -74,3 +80,66 @@
     (260  nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	255	49	255	53	254	57	254	61	254	65	253	69	253	73	252	79	251	85	250	97	248	109	248	121)
     (280  nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	275	53	274	57	274	61	274	65	273	69	273	73	272	79	271	85	270	97	268	109	268	121)
     (300  nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	nil	295	53	294	57	294	61	294	65	293	69	293	73	292	79	291	85	290	97	288	109	288	121)))
+
+
+(defparameter *gost_7805-70_length*
+  (mapcar #'car *gost_7805-70_length_d_b_l1*))
+
+(defparameter *gost_7805-70_d_b_l1*
+  (lst-arr:list-list-transponate (mapcar #'cdr *gost_7805-70_length_d_b_l1*)))
+
+(defun get-from-gost_7805-70_length_d_b_l1 (key)
+    (let ((rez nil))
+    (mapcar #'(lambda (dia str b_l1)
+		(mapcar #'(lambda (k len)
+		     (cond
+		       ((and k (equal key str))
+			(setf rez (cons (list dia len k ) rez)))))
+		 b_l1
+		 *gost_7805-70_length*))
+	    *gost_7805-70_length_d*
+	    *gost_7805-70_length_b_l1_str*
+	    *gost_7805-70_d_b_l1*)
+	  (reverse rez)))
+
+(defparameter *gost_7805-70_tbl-d-l-b-l1*
+  (let ((seq (get-from-gost_7805-70_length_d_b_l1 "b")))
+    (mapcar
+     #'(lambda(el)
+	 (setf seq
+	       (substitute
+		(append
+		 (list (abs (first el))
+		       (abs (second el))
+		       (third el)
+		      ) 
+		 (list
+		  (third
+		   (find (list (first el) (second el))
+			 (get-from-gost_7805-70_length_d_b_l1 "l1")
+			 :test #'equal
+			 :key #'(lambda (p) (list (first p) (second p)))))))
+		el  seq :test #'equal)))
+     (get-from-gost_7805-70_length_d_b_l1 "b"))
+    seq))
+
+(defun select-bolt-gost_7805-70 (l_gl l_rez &key (d_min 1) (d_max 48))
+  "Позволяет подобрать длину болта по ГОСТ 7805-70
+l_gl  - длина гладкой части свинчиваемого участка;
+l_rez - длина резьбовой части свинчиваемого участка;
+Примеры использования:
+(select-bolt-gost_7805-70 15 15)
+(select-bolt-gost_7805-70 15 15 :d_min 10 )
+(select-bolt-gost_7805-70 15 15 :d_max 12 )
+(select-bolt-gost_7805-70 15 15 :d_min 10 :d_max 10 )
+"
+  (remove-if-not
+   #'(lambda (x)
+       (let ((d (first x))
+	     (l (second x))
+	     (b (if (numberp (third x)) (third x) (second x))))
+	 (and (< (- l b ) l_gl)
+	      (> l (+ l_gl l_rez))
+	      (<= d d_max)
+	      (>= d d_min))))
+   *gost_7805-70_tbl-d-l-b-l1*))
